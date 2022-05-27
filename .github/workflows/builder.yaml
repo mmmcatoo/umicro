@@ -22,15 +22,13 @@ jobs:
           sudo chown $USER:$GROUPS /workdir
 
       - name: Clone source code
-        working-directory: /workdir
         run: |
           wget https://www.php.net/distributions/"$VERSION".tar.gz && tar xzf "$VERSION".tar.gz && cd "$VERSION"
           git clone https://github.com/easysoft/phpmicro.git sapi/micro
-          patch -p1 < sapi/micro/pathches/cli_checks_"$VVERSION".patch
-          patch -p1 < sapi/micro/pathches/disable_huge_page.patch
+          patch -p1 < sapi/micro/patches/cli_checks_"$VVERSION".patch
+          patch -p1 < sapi/micro/patches/disable_huge_page.patch
 
       - name: Install build tools
-        working-directory: /workdir
         run: |
           sudo -E apt-get -qq install build-essential autoconf m4 make -y
           ./buildconf --force
@@ -55,6 +53,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /workdir/"$VERSION"/sapi/micro/micro.sfx
+          asset_path: "$VERSION"/sapi/micro/micro.sfx
           asset_name: micro.sfx
 
