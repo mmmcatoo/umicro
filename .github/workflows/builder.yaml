@@ -1,0 +1,61 @@
+name: uMicroBuilder
+on: [push]
+env:
+  TZ: Asia/Shanghai
+  VERSION: php-8.1.6
+  VVERSION: 8.1
+jobs:
+  buildBinary:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Clean system disk
+        run : |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "$TZ"
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
+
+      - name: Clone source code
+        working-directory: /workdir
+        run: |
+          wget https://www.php.net/distributions/"$VERSION".tar.gz && tar xzf "$VERSION".tar.gz && cd "$VERSION"
+          git clone https://github.com/easysoft/phpmicro.git sapi/micro
+          patch -p1 < sapi/micro/pathches/cli_checks_"$VVERSION".patch
+          patch -p1 < sapi/micro/pathches/disable_huge_page.patch
+
+      - name: Install build tools
+        working-directory: /workdir
+        run: |
+          sudo -E apt-get -qq install build-essential autoconf m4 make -y
+          ./buildconf --force
+          ./configuration --disable-all --disable-zts --enable-micro
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        working-directory: /workdir
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: sapi/micro/micro.sfx
+          asset_name: micro.sfx
+
